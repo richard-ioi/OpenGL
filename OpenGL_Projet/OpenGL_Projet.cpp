@@ -6,6 +6,11 @@
 #include <cmath>
 #include <math.h>
 
+#include <iostream>
+#include <algorithm>
+#include <vector>
+#include <iterator>
+
 #include "GL/glew.h"
 
 #include <GLFW/glfw3.h>
@@ -14,6 +19,9 @@
 
 #include "Vertex.h"
 #include "DragonData.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../libs/tiny_obj_loader/tiny_obj_loader.h"
 
 // attention, ce define ne doit etre specifie que dans 1 seul fichier cpp
 #define STB_IMAGE_IMPLEMENTATION
@@ -27,8 +35,85 @@ GLuint VAO;
 
 GLuint TexID;
 
+
 bool Initialise()
 {
+    std::vector<Vertex> Vertices;
+    std::vector<uint16_t> Indices;
+    std::string inputfile = "teapot.obj";
+    tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = "./"; // Path to material files
+
+    tinyobj::ObjReader reader;
+
+
+    if (!reader.ParseFromFile(inputfile, reader_config)) {
+        if (!reader.Error().empty()) {
+            std::cerr << "TinyObjReader: " << reader.Error();
+        }
+        exit(1);
+    }
+
+    if (!reader.Warning().empty()) {
+        std::cout << "TinyObjReader: " << reader.Warning();
+    }
+
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+    auto& materials = reader.GetMaterials();
+
+    // Loop over shapes
+    for (size_t s = 0; s < shapes.size(); s++) {
+        // Loop over faces(polygon)
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+
+            // Loop over vertices in the face.
+            for (size_t v = 0; v < fv; v++) {
+                float normal[] = { 0,0,0 };
+                float uv[] = { 0,0,0 };
+                // access to vertex
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+
+                float position[] = { vx, vy, vz };
+
+                // Check if `normal_index` is zero or positive. negative = no normal data
+                if (idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                    normal[0] = nx;
+                    normal[1] = ny;
+                    normal[2] = nz;
+                }
+
+                // Check if `texcoord_index` is zero or positive. negative = no texcoord data
+                if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                    uv[0] = tx;
+                    uv[1] = ty;
+                }
+                Vertex Vj = { *position, *normal, *uv };
+                Vertices.push_back(Vj);
+                Indices.push_back(Vertices.size());
+
+                // Optional: vertex colors
+                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+            }
+            index_offset += fv;
+
+            // per-face material
+            shapes[s].mesh.material_ids[f];
+        }
+    }
+
     GLenum ret = glewInit();
 
     g_TransformShader.LoadVertexShader("transform.vs");
@@ -38,6 +123,7 @@ bool Initialise()
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(DragonVertices), DragonVertices, GL_STATIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, Vertices.size() * sizeof(Vertex), &Vertices[0], GL_STATIC_DRAW);
 
     glGenBuffers(1, &IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
@@ -175,7 +261,7 @@ int main(void)
         return -1;
 
     /* Create a windowed mode window and its OpenGL context */
-    window = glfwCreateWindow(640, 480, "Transform 2D", NULL, NULL);
+    window = glfwCreateWindow(900, 600, "ESIEE Paris - E4FI - Projet OpenGL - DESRIAUX FOUQUOIRE RENARD KUGATHAS", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
