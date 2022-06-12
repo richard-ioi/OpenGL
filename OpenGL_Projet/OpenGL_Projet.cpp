@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <vector>
 #include <iterator>
+#include <tuple>
 
 #include "GL/glew.h"
 
@@ -18,10 +19,10 @@
 #include "../common/GLShader.h"
 
 #include "Vertex.h"
-#include "DragonData.h"
+#include "Models/DragonData.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include "../libs/tiny_obj_loader/tiny_obj_loader.h"
+#include "tiny_obj_loader.h"
 
 // attention, ce define ne doit etre specifie que dans 1 seul fichier cpp
 #define STB_IMAGE_IMPLEMENTATION
@@ -35,12 +36,12 @@ GLuint VAO;
 
 GLuint TexID;
 
+std::vector<Vertex> Vertices;
+std::vector<uint16_t> Indices;
 
-bool Initialise()
-{
+std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string inputfile) {
     std::vector<Vertex> Vertices;
     std::vector<uint16_t> Indices;
-    std::string inputfile = "teapot.obj";
     tinyobj::ObjReaderConfig reader_config;
     reader_config.mtl_search_path = "./"; // Path to material files
 
@@ -71,36 +72,41 @@ bool Initialise()
 
             // Loop over vertices in the face.
             for (size_t v = 0; v < fv; v++) {
-                float normal[] = { 0,0,0 };
-                float uv[] = { 0,0,0 };
+                tinyobj::real_t nx = 0, ny = 0, nz = 0;
+                tinyobj::real_t tx = 0, ty = 0;
+
                 // access to vertex
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
                 tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
-                float position[] = { vx, vy, vz };
-
                 // Check if `normal_index` is zero or positive. negative = no normal data
                 if (idx.normal_index >= 0) {
-                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
-                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
-                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
-                    normal[0] = nx;
-                    normal[1] = ny;
-                    normal[2] = nz;
+                    nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                    ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                    nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
                 }
 
                 // Check if `texcoord_index` is zero or positive. negative = no texcoord data
                 if (idx.texcoord_index >= 0) {
-                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-                    uv[0] = tx;
-                    uv[1] = ty;
+                    tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
                 }
-                Vertex Vj = { *position, *normal, *uv };
-                Vertices.push_back(Vj);
-                Indices.push_back(Vertices.size());
+
+                Vertex Vj = { { vx, vy, vz }, { nx, ny, nz}, {tx, ty} };
+
+                uint16_t index = Vertices.size();
+                auto it = std::find(Vertices.begin(), Vertices.end(), Vj);
+                if (it != Vertices.end()) {
+                    index = it - Vertices.begin();
+                }
+                else {
+                    Vertices.push_back(Vj);
+                }
+
+                Indices.push_back(index);
+
 
                 // Optional: vertex colors
                 // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
@@ -110,10 +116,15 @@ bool Initialise()
             index_offset += fv;
 
             // per-face material
-            shapes[s].mesh.material_ids[f];
+            //shapes[s].mesh.material_ids[f];
         }
     }
+    return {Vertices, Indices};
+}
 
+bool Initialise()
+{
+    tie(Vertices, Indices) = LoadObj("Models/teapot.obj");
     GLenum ret = glewInit();
 
     g_TransformShader.LoadVertexShader("transform.vs");
@@ -122,12 +133,13 @@ bool Initialise()
 
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(DragonVertices), DragonVertices, GL_STATIC_DRAW);
-    //glBufferData(GL_ARRAY_BUFFER, Vertices.size() * sizeof(Vertex), &Vertices[0], GL_STATIC_DRAW);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(DragonVertices), DragonVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, Vertices.size() * sizeof(Vertex), &Vertices[0], GL_STATIC_DRAW);
 
     glGenBuffers(1, &IBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(DragonIndices), DragonIndices, GL_STATIC_DRAW);
+    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(DragonIndices), DragonIndices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, Indices.size()*sizeof(uint16_t), &Indices[0], GL_STATIC_DRAW);
 
     constexpr size_t stride = sizeof(Vertex);// sizeof(float) * 5;
 
@@ -159,7 +171,7 @@ bool Initialise()
     glGenTextures(1, &TexID);
     glBindTexture(GL_TEXTURE_2D, TexID);
     int w, h;
-    uint8_t* data = stbi_load("dragon.png", &w, &h, nullptr, STBI_rgb_alpha);
+    uint8_t* data = stbi_load("Models/Textures/dragon.png", &w, &h, nullptr, STBI_rgb_alpha);
     if (data != nullptr) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
@@ -217,14 +229,14 @@ void Render(GLFWwindow* window)
     //colonnes d'abord
     //multiplication : droite vers la gauche
     //v' = M * v
-    float rotation2D_homogene3D[] = { cosf(time),     sinf(time),     0.0f
+    float rotation2D_homogene3D[] = { cosf(time),     sinf(time),     0.0f,
                                         - sinf(time),    cosf(time),     0.0f,
                                         0.0f,           0.0f,           1.0f };
 
     float rotation2D_homogene4D[] = {   cosf(time),         sinf(time),     0.0f,       0.0f,
                                         -sinf(time),        cosf(time),     0.0f,       0.0f,
                                         0.0f,               0.0f,           1.0f,       0.0f,
-                                        0.0f,               0.0f,           -30.0f,     1.0f };
+                                        0.0f,               0.0f,           -50.0f,     1.0f };
 
     GLint rot2D_location = glGetUniformLocation(program, "u_rotation4D");
     glUniformMatrix4fv(rot2D_location, 1, false, rotation2D_homogene4D);
@@ -245,7 +257,7 @@ void Render(GLFWwindow* window)
     glUniformMatrix4fv(rot2D_proj, 1, false, projection);
 
     glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, _countof(DragonIndices), GL_UNSIGNED_SHORT, 0);
+    glDrawElements(GL_TRIANGLES, Indices.size(), GL_UNSIGNED_SHORT, 0);
 
     // on suppose que la phase d’echange des buffers front et back
     // le « swap buffers » est effectuee juste apres
