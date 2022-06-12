@@ -28,6 +28,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+std::string ObjectModel = "Models/penguin.obj";
+const char * ObjectTexture = "Models/Textures/penguin.png";
+
 GLShader g_TransformShader;
 
 GLuint VBO;
@@ -38,12 +41,13 @@ GLuint TexID;
 
 std::vector<Vertex> Vertices;
 std::vector<uint16_t> Indices;
+std::vector<float> Colors;
 
 std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string inputfile) {
     std::vector<Vertex> Vertices;
     std::vector<uint16_t> Indices;
     tinyobj::ObjReaderConfig reader_config;
-    reader_config.mtl_search_path = "./"; // Path to material files
+    reader_config.mtl_search_path = "./Models/"; // Path to material files
 
     tinyobj::ObjReader reader;
 
@@ -94,7 +98,7 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
                     ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
                 }
 
-                Vertex Vj = { { vx, vy, vz }, { nx, ny, nz}, {tx, ty} };
+                Vertex Vj = { { vx, vy, vz }, { nx, ny, nz }, { tx, ty } };
 
                 uint16_t index = Vertices.size();
                 auto it = std::find(Vertices.begin(), Vertices.end(), Vj);
@@ -109,9 +113,12 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
 
 
                 // Optional: vertex colors
-                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+                tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+                tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+                tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+                Colors.push_back(red);
+                Colors.push_back(green);
+                Colors.push_back(blue);
             }
             index_offset += fv;
 
@@ -124,7 +131,7 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
 
 bool Initialise()
 {
-    tie(Vertices, Indices) = LoadObj("Models/teapot.obj");
+    tie(Vertices, Indices) = LoadObj(ObjectModel);
     GLenum ret = glewInit();
 
     g_TransformShader.LoadVertexShader("transform.vs");
@@ -171,7 +178,7 @@ bool Initialise()
     glGenTextures(1, &TexID);
     glBindTexture(GL_TEXTURE_2D, TexID);
     int w, h;
-    uint8_t* data = stbi_load("Models/Textures/dragon.png", &w, &h, nullptr, STBI_rgb_alpha);
+    uint8_t* data = stbi_load(ObjectTexture, &w, &h, nullptr, STBI_rgb_alpha);
     if (data != nullptr) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
@@ -233,10 +240,11 @@ void Render(GLFWwindow* window)
                                         - sinf(time),    cosf(time),     0.0f,
                                         0.0f,           0.0f,           1.0f };
 
-    float rotation2D_homogene4D[] = {   cosf(time),         sinf(time),     0.0f,       0.0f,
-                                        -sinf(time),        cosf(time),     0.0f,       0.0f,
+    float rotation2D_homogene4D[] = {   
                                         0.0f,               0.0f,           1.0f,       0.0f,
-                                        0.0f,               0.0f,           -50.0f,     1.0f };
+                                        cosf(time),         sinf(time),     0.0f,       0.0f,
+                                        -sinf(time),        cosf(time),     0.0f,       0.0f,
+                                        0.0f,               0.0f,           -5.0f,     1.0f };
 
     GLint rot2D_location = glGetUniformLocation(program, "u_rotation4D");
     glUniformMatrix4fv(rot2D_location, 1, false, rotation2D_homogene4D);
