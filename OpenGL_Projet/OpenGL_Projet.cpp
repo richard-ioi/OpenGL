@@ -39,6 +39,8 @@ GLuint VAO;
 
 GLuint TexID;
 
+float zoom = 1.0f;
+
 std::vector<Vertex> Vertices;
 std::vector<uint16_t> Indices;
 std::vector<float> Colors;
@@ -240,17 +242,39 @@ void Render(GLFWwindow* window)
     //colonnes d'abord
     //multiplication : droite vers la gauche
     //v' = M * v
-    float rotation2D_homogene3D[] = { cosf(time),     sinf(time),     0.0f,
-                                        - sinf(time),    cosf(time),     0.0f,
-                                        0.0f,           0.0f,           1.0f };
+
+    
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+        zoom += 0.01f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        zoom -= 0.01f;
+    }
+
+    float scale2D_homogene4D[] = { zoom,  0.0f,  0.0f,  0.0f,
+                                   0.0f,  zoom,  0.0f,  0.0f,
+                                   0.0f,  0.0f,  zoom,  0.0f,
+                                   0.0f,  0.0f,  0.0f,  1.0f };
 
     float rotation2D_homogene4D[] = { cosf(time),    0.0f,     sinf(time),       0.0f,
                                         0.0f,    1.0f,     0.0f,       0.0f,
                                         -sinf(time),  0.0f,      cosf(time),       0.0f,
-                                        0.0f,               0.0f,           -5.0f,      1.0f };
+                                        0.0f,               -1.0f,           -5.0f,      1.0f };
 
-    GLint rot2D_location = glGetUniformLocation(program, "u_rotation4D");
-    glUniformMatrix4fv(rot2D_location, 1, false, rotation2D_homogene4D);
+    float translation2D_homogene4D[] = { 1.0f,  0.0f,  0.0f,  0.0f,
+                                         0.0f,  1.0f,  0.0f,  0.0f,
+                                         0.0f,  0.0f,  1.0f,  0.0f,
+                                         0.0f,  0.0f,  0.0f,  1.0f };
+
+    GLint rot2D_scale = glGetUniformLocation(program, "u_scale");
+    glUniformMatrix4fv(rot2D_scale, 1, false, scale2D_homogene4D);
+
+    GLint rot2D_rotation = glGetUniformLocation(program, "u_rotation");
+    glUniformMatrix4fv(rot2D_rotation, 1, false, rotation2D_homogene4D);
+
+    GLint rot2D_translation = glGetUniformLocation(program, "u_translation");
+    glUniformMatrix4fv(rot2D_translation, 1, false, translation2D_homogene4D);
 
     const float zNear = 0.1f;
     const float zFar = 100.0f;
