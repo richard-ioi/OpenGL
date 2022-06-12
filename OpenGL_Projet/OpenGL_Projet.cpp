@@ -208,11 +208,15 @@ void Render(GLFWwindow* window)
     int width, height;
     glfwGetWindowSize(window, &width, &height);
 
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glDepthFunc(GL_LESS);
+    
     // etape a. A vous de recuperer/passer les variables width/height
     glViewport(0, 0, width, height);
     // etape b. Notez que glClearColor est un etat, donc persistant
     glClearColor(0.5f, 0.5f, 0.5f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // etape c. on specifie le shader program a utiliser
     auto program = g_TransformShader.GetProgram();
     glUseProgram(program);
@@ -240,11 +244,10 @@ void Render(GLFWwindow* window)
                                         - sinf(time),    cosf(time),     0.0f,
                                         0.0f,           0.0f,           1.0f };
 
-    float rotation2D_homogene4D[] = {   
-                                        0.0f,               0.0f,           1.0f,       0.0f,
-                                        cosf(time),         sinf(time),     0.0f,       0.0f,
-                                        -sinf(time),        cosf(time),     0.0f,       0.0f,
-                                        0.0f,               0.0f,           -5.0f,     1.0f };
+    float rotation2D_homogene4D[] = { cosf(time),    0.0f,     sinf(time),       0.0f,
+                                        0.0f,    1.0f,     0.0f,       0.0f,
+                                        -sinf(time),  0.0f,      cosf(time),       0.0f,
+                                        0.0f,               0.0f,           -5.0f,      1.0f };
 
     GLint rot2D_location = glGetUniformLocation(program, "u_rotation4D");
     glUniformMatrix4fv(rot2D_location, 1, false, rotation2D_homogene4D);
