@@ -39,11 +39,28 @@ GLuint VAO;
 
 GLuint TexID;
 
-float zoom = 1.0f;
+float scale= 1.0f, x_translation = 0.0f, y_translation = 0.0f, z_translation = 0.0f;
+
+float deltaTime = 1.0f;
+float movementSpeed = 0.01f;
+float currentTime = 0;
+double lastTime = 0;
 
 std::vector<Vertex> Vertices;
 std::vector<uint16_t> Indices;
-std::vector<float> Colors;
+
+void UpdateScale(GLFWwindow* window, double xoffset, double yoffset) {
+    scale += yoffset * deltaTime * movementSpeed;
+}
+
+void UpdateTranslation(GLFWwindow* window) {
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        x_translation += deltaTime * movementSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+        x_translation -= deltaTime * movementSpeed;
+    }
+}
 
 std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string inputfile) {
     std::vector<Vertex> Vertices;
@@ -115,12 +132,9 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
 
 
                 // Optional: vertex colors
-                tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+                /*tinyobj::real_t red = attrib.colors[3 * size_t(idx.vertex_index) + 0];
                 tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
-                Colors.push_back(red);
-                Colors.push_back(green);
-                Colors.push_back(blue);
+                tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];*/
             }
             index_offset += fv;
 
@@ -243,18 +257,16 @@ void Render(GLFWwindow* window)
     //multiplication : droite vers la gauche
     //v' = M * v
 
-    
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-        zoom += 0.01f;
-    }
+    lastTime = currentTime;
+    currentTime = glfwGetTime();
+    float deltaTime = float(currentTime - lastTime);
 
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        zoom -= 0.01f;
-    }
+    UpdateTranslation(window);
+    glfwSetScrollCallback(window, UpdateScale);
 
-    float scale2D_homogene4D[] = { zoom,  0.0f,  0.0f,  0.0f,
-                                   0.0f,  zoom,  0.0f,  0.0f,
-                                   0.0f,  0.0f,  zoom,  0.0f,
+    float scale2D_homogene4D[] = { scale,  0.0f,  0.0f,  0.0f,
+                                   0.0f,  scale,  0.0f,  0.0f,
+                                   0.0f,  0.0f,  scale,  0.0f,
                                    0.0f,  0.0f,  0.0f,  1.0f };
 
     float rotation2D_homogene4D[] = { cosf(time),    0.0f,     sinf(time),       0.0f,
@@ -262,9 +274,9 @@ void Render(GLFWwindow* window)
                                         -sinf(time),  0.0f,      cosf(time),       0.0f,
                                         0.0f,               -1.0f,           -5.0f,      1.0f };
 
-    float translation2D_homogene4D[] = { 1.0f,  0.0f,  0.0f,  0.0f,
-                                         0.0f,  1.0f,  0.0f,  0.0f,
-                                         0.0f,  0.0f,  1.0f,  0.0f,
+    float translation2D_homogene4D[] = { 1.0f,  0.0f,  0.0f,  x_translation,
+                                         0.0f,  1.0f,  0.0f,  y_translation,
+                                         0.0f,  0.0f,  1.0f,  z_translation,
                                          0.0f,  0.0f,  0.0f,  1.0f };
 
     GLint rot2D_scale = glGetUniformLocation(program, "u_scale");
