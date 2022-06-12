@@ -22,7 +22,7 @@ void main(void)
 
 	//l'ordre des transformations est important -> sens de rotation
 	//v' = PROJECTION * (T * R * S * v)
-	gl_Position = u_projection * (u_rotation4D * vec4(a_position, 1.0)); //en changeant la pos, on éloigne le PDV/"caméra"
+	gl_Position = u_projection * (u_rotation4D * vec4(a_position, 1.0)); //en changeant la pos, on ï¿½loigne le PDV/"camï¿½ra"
 	// X=a_position.x;Y=a_position.y;Z=0.0;W=1.0
 
 	// xyzw ou rgba
