@@ -49,6 +49,20 @@ double lastTime = 0;
 std::vector<Vertex> Vertices;
 std::vector<uint16_t> Indices;
 
+float * Multiply4DMatrices(float * _m1, float * _m2) {
+    float result[16];
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            float sum = 0.0f;
+            for (int k = 0; k < 4; k++) {
+                sum += _m1[i * 4 + k] * _m2[j + 4 * k];
+            }
+            result[i * 4 + j] = sum;
+        }
+    }
+    return result;
+}
+
 void UpdateScale(GLFWwindow* window, double xoffset, double yoffset) {
     scale += yoffset * deltaTime * movementSpeed;
 }
@@ -330,6 +344,23 @@ void Render(GLFWwindow* window)
 
 int main(void)
 {
+    float m1[] = {2.0f,  4.0f,  5.0f,  2.0f,
+                2.0f,  4.0f,  2.0f,  4.0f,
+                2.0f,  4.0f,  2.0f,  3.0f,
+                8.0f,  5.0f,  4.0f,  5.0f };
+
+    float m2[] = { 4.0f,  5.0f,  2.0f,  1.0f,
+                2.0f,  1.0f,  1.0f,  2.0f,
+                10.0f,  1.0f,  5.0f,  25.0f,
+                2.0f,  5.0f,  9.0f,  9.0f };
+    float* newM;
+    newM = Multiply4DMatrices(m1, m2);
+
+
+    for (int i = 0; i < 16; i++) {
+        printf("%f ", newM[i]);
+    }
+
     GLFWwindow* window;
 
     /* Initialize the library */
