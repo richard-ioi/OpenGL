@@ -60,6 +60,18 @@ void UpdateTranslation(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
         x_translation -= deltaTime * movementSpeed;
     }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+        z_translation += deltaTime * movementSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        z_translation -= deltaTime * movementSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) {
+        y_translation += deltaTime * movementSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        y_translation -= deltaTime * movementSpeed;
+    }
 }
 
 std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string inputfile) {
@@ -269,10 +281,15 @@ void Render(GLFWwindow* window)
                                    0.0f,  0.0f,  scale,  0.0f,
                                    0.0f,  0.0f,  0.0f,  1.0f };
 
-    float rotation2D_homogene4D[] = { cosf(time),    0.0f,     sinf(time),       0.0f,
+    /*float rotation2D_homogene4D[] = {cosf(time),    0.0f,     sinf(time),       0.0f,
                                         0.0f,    1.0f,     0.0f,       0.0f,
                                         -sinf(time),  0.0f,      cosf(time),       0.0f,
-                                        0.0f,               -1.0f,           -5.0f,      1.0f };
+                                        0.0f,               -1.0f,           -5.0f,      1.0f };*/
+
+    float rotation2D_homogene4D[] = { 1.0f,  0.0f,  0.0f,  0.0f,
+                                   0.0f,  cosf(time),  -sinf(time),  0.0f,
+                                   0.0f,  sinf(time),  cosf(time),  0.0f,
+                                   0.0f,  0.0f,  -5.0f,  1.0f };
 
     float translation2D_homogene4D[] = { 1.0f,  0.0f,  0.0f,  x_translation,
                                          0.0f,  1.0f,  0.0f,  y_translation,
