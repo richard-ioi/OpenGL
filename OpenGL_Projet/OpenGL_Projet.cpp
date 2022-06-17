@@ -53,11 +53,10 @@ float * Multiply4DMatrices(float * _m1, float * _m2) {
     float result[16];
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            float sum = 0.0f;
+            result[i * 4 + j] = 0.0f;
             for (int k = 0; k < 4; k++) {
-                sum += _m1[i * 4 + k] * _m2[j + 4 * k];
+                result[i * 4 + j] += _m1[i * 4 + k] * _m2[j + 4 * k];
             }
-            result[i * 4 + j] = sum;
         }
     }
     return result;
