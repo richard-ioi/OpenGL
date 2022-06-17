@@ -12,10 +12,13 @@ varying vec4 v_color;
 
 uniform float u_time;
 
+uniform mat4 u_projection;
+mat4 u_view;
+mat4 u_model;
+
+uniform mat4 u_translation;
 uniform mat4 u_scale;
 uniform mat4 u_rotation;
-uniform mat4 u_translation;
-uniform mat4 u_projection;
 
 void main(void) 
 {
@@ -24,7 +27,8 @@ void main(void)
 
 	//l'ordre des transformations est important -> sens de rotation
 	//v' = PROJECTION * (T * R * S * v)
-	gl_Position = u_projection * ( u_translation * u_rotation * u_scale * vec4(a_position, 1.0)); //en changeant la pos, on eloigne le PDV/"camera"
+	u_model = u_translation * u_rotation * u_scale;
+	gl_Position =  (u_projection * u_model) * vec4(a_position,1.0) ; //en changeant la pos, on eloigne le PDV/"camera"
 	// X=a_position.x;Y=a_position.y;Z=0.0;W=1.0
 
 	// xyzw ou rgba

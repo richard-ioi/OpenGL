@@ -13,12 +13,14 @@
 #include <tuple>
 
 #include "GL/glew.h"
-
 #include <GLFW/glfw3.h>
-
 #include "../common/GLShader.h"
 
 #include "Vertex.h"
+#include "vec3.h"
+#include "vec2.h"
+#include "Color.h"
+
 #include "Models/DragonData.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -39,26 +41,53 @@ GLuint VAO;
 
 GLuint TexID;
 
-float scale= 1.0f, x_translation = 0.0f, y_translation = 0.0f, z_translation = 0.0f;
+float scale= 1.0f, x_translation = 1.0f, y_translation = 1.0f, z_translation = 1.0f;
 
 float deltaTime = 1.0f;
-float movementSpeed = 0.01f;
+float movementSpeed = 1.0f;
 float currentTime = 0;
 double lastTime = 0;
 
 std::vector<Vertex> Vertices;
 std::vector<uint16_t> Indices;
 
+float * CreateViewMatrix(vec3 position, vec3 target, vec3 up) {
+    vec3 forward = -(target-position);
+    normalize(&forward);
+    vec3 right = forward*up;
+    static float ViewMatrix[16];
+    ViewMatrix[0] = forward.x;
+    ViewMatrix[1] = right.x;
+    ViewMatrix[2] = up.x;
+    ViewMatrix[3] = 0.0f;
+    ViewMatrix[4] = forward.y;
+    ViewMatrix[5] = right.y;
+    ViewMatrix[6] = up.y;
+    ViewMatrix[7] = 0.0f;
+    ViewMatrix[8] = forward.z;
+    ViewMatrix[9] = right.z;
+    ViewMatrix[10] = up.z;
+    ViewMatrix[11] = 0.0f;
+    ViewMatrix[12] = -dot(forward,position);
+    ViewMatrix[13] = -dot(right, position);
+    ViewMatrix[14] = -dot(up, position);;
+    ViewMatrix[15] = 1.0f;
+
+    return ViewMatrix;
+}
+
 float * Multiply4DMatrices(float * _m1, float * _m2) {
-    float result[16];
+    static float result[16];
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
-            result[i + j * 4] = 0.0f;
+            float sum = 0.0f;
             for (int k = 0; k < 4; k++) {
-                result[i + j * 4] += _m1[i * 4 + k] * _m2[j + 4 * k];
+                sum += _m1[i * 4 + k] * _m2[j + 4 * k];
             }
+            //printf("%f\n", sum);
         }
     }
+    
     return result;
 }
 
@@ -152,19 +181,9 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
                 else {
                     Vertices.push_back(Vj);
                 }
-
                 Indices.push_back(index);
-
-
-                // Optional: vertex colors
-                /*tinyobj::real_t red = attrib.colors[3 * size_t(idx.vertex_index) + 0];
-                tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];*/
             }
             index_offset += fv;
-
-            // per-face material
-            //shapes[s].mesh.material_ids[f];
         }
     }
     return {Vertices, Indices};
@@ -188,6 +207,7 @@ bool Initialise()
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
     //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(DragonIndices), DragonIndices, GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, Indices.size()*sizeof(uint16_t), &Indices[0], GL_STATIC_DRAW);
+
 
     constexpr size_t stride = sizeof(Vertex);// sizeof(float) * 5;
 
@@ -289,51 +309,66 @@ void Render(GLFWwindow* window)
     UpdateTranslation(window);
     glfwSetScrollCallback(window, UpdateScale);
 
-    float scale2D_homogene4D[] = { scale,  0.0f,  0.0f,  0.0f,
-                                   0.0f,  scale,  0.0f,  0.0f,
-                                   0.0f,  0.0f,  scale,  0.0f,
-                                   0.0f,  0.0f,  0.0f,  1.0f };
+    float scaleObjectMatrix[] = { scale,  0.0f,  0.0f,  0.0f,
+                            0.0f,  scale,  0.0f,  0.0f,
+                            0.0f,  0.0f,  scale,  0.0f,
+                            0.0f,  0.0f,  0.0f,  1.0f };
 
-    /*float rotation2D_homogene4D[] = {cosf(time),    0.0f,     sinf(time),       0.0f,
+    float rotationObjectMatrix[] = {cosf(time),    0.0f,     sinf(time),       0.0f,
                                         0.0f,    1.0f,     0.0f,       0.0f,
                                         -sinf(time),  0.0f,      cosf(time),       0.0f,
-                                        0.0f,               -1.0f,           -5.0f,      1.0f };*/
+                                        0.0f,               -1.0f,           -5.0f,      1.0f };
 
-    float rotation2D_homogene4D[] = { 1.0f,  0.0f,  0.0f,  0.0f,
-                                   0.0f,  cosf(time),  -sinf(time),  0.0f,
-                                   0.0f,  sinf(time),  cosf(time),  0.0f,
-                                   0.0f,  0.0f,  -5.0f,  1.0f };
+    /*float rotationObjectMatrix[] = {1.0f,  0.0f,  0.0f,  0.0f,
+                                   0.0f,  1.0f,  0.0f,  0.0f,
+                                   0.0f,  0.0f, 1.0f,  0.0f,
+                                   0.0f,  -1.0f,  -5.0f,  1.0f };*/
 
-    float translation2D_homogene4D[] = { 1.0f,  0.0f,  0.0f,  x_translation,
-                                         0.0f,  1.0f,  0.0f,  y_translation,
-                                         0.0f,  0.0f,  1.0f,  z_translation,
+    float translationObjectMatrix[] = { 1.0f,  0.0f,  0.0f,  0.0f,
+                                         0.0f,  1.0f,  0.0f,  0.0f,
+                                         0.0f,  0.0f,  1.0f,  0.0f,
                                          0.0f,  0.0f,  0.0f,  1.0f };
     
-    float worldMatrix[] = Multiply4DMatrices(translation2D_homogene4D,Multiply4DMatrices(rotation2D_homogene4D,scale2D_homogene4D));
-    
-    GLint rot2D_scale = glGetUniformLocation(program, "u_scale");
-    glUniformMatrix4fv(rot2D_scale, 1, false, scale2D_homogene4D);
+    GLint scaleObject = glGetUniformLocation(program, "u_scale");
+    glUniformMatrix4fv(scaleObject, 1, false, scaleObjectMatrix);
 
-    GLint rot2D_rotation = glGetUniformLocation(program, "u_rotation");
-    glUniformMatrix4fv(rot2D_rotation, 1, false, rotation2D_homogene4D);
 
-    GLint rot2D_translation = glGetUniformLocation(program, "u_translation");
-    glUniformMatrix4fv(rot2D_translation, 1, false, translation2D_homogene4D);
+    GLint rotationObject = glGetUniformLocation(program, "u_rotation");
+    glUniformMatrix4fv(rotationObject, 1, false, rotationObjectMatrix);
+
+    GLint translationObject = glGetUniformLocation(program, "u_translation");
+    glUniformMatrix4fv(translationObject, 1, false, translationObjectMatrix);
+
+
+    float* ModelMatrix = Multiply4DMatrices(translationObjectMatrix, Multiply4DMatrices(rotationObjectMatrix, scaleObjectMatrix));
+
+    vec3 position = { x_translation, y_translation, z_translation };
+    vec3 target = { 0.0f,0.0f,0.0f};
+    vec3 up = { 0.0f,1.0f,0.0f };
+
+    float * ViewMatrix = CreateViewMatrix(position, target, up);
 
     const float zNear = 0.1f;
     const float zFar = 800.0f;
     const float aspect = float(width) / float(height); //important de cast en float
     const float fov = 45.0f * M_PI / 180.0; //en radian
     const float f = 1.0f / tanf(fov / 2.0f); //cotan = 1/tan
-    const float projection[] = {
+    const float ProjectionMatrix[] = {
         f / aspect, 0.f, 0.f, 0.f,
         0.f, f, 0.f, 0.f,
         0.f, 0.f, ((zFar + zNear) / (zNear - zFar)), -1.f,
         0.f, 0.f, ((2 * zNear * zFar) / (zNear - zFar)), 0.f
     };
 
-    GLint rot2D_proj = glGetUniformLocation(program, "u_projection");
-    glUniformMatrix4fv(rot2D_proj, 1, false, projection);
+
+    GLint projection = glGetUniformLocation(program, "u_projection");
+    glUniformMatrix4fv(projection, 1, false, ProjectionMatrix);
+
+    GLint view = glGetUniformLocation(program, "u_view");
+    glUniformMatrix4fv(view, 1, false, ViewMatrix);
+
+    GLint model = glGetUniformLocation(program, "u_model");
+    glUniformMatrix4fv(model, 1, false, ModelMatrix);
 
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, Indices.size(), GL_UNSIGNED_SHORT, 0);
@@ -345,23 +380,6 @@ void Render(GLFWwindow* window)
 
 int main(void)
 {
-    float m1[] = {2.0f,  4.0f,  5.0f,  2.0f,
-                2.0f,  4.0f,  2.0f,  4.0f,
-                2.0f,  4.0f,  2.0f,  3.0f,
-                8.0f,  5.0f,  4.0f,  5.0f };
-
-    float m2[] = { 4.0f,  5.0f,  2.0f,  1.0f,
-                2.0f,  1.0f,  1.0f,  2.0f,
-                10.0f,  1.0f,  5.0f,  25.0f,
-                2.0f,  5.0f,  9.0f,  9.0f };
-    float* newM;
-    newM = Multiply4DMatrices(m1, m2);
-
-
-    for (int i = 0; i < 16; i++) {
-        printf("%f ", newM[i]);
-    }
-
     GLFWwindow* window;
 
     /* Initialize the library */

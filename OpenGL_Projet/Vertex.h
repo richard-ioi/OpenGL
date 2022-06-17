@@ -1,18 +1,7 @@
 #pragma once
 
-#include <cstdint>
-
-struct vec2 {
-    float x, y;
-};
-
-struct vec3 {
-    float x, y, z;
-};
-
-struct Color {
-    uint8_t r, g, b, a;
-};
+#include "vec3.h"
+#include "vec2.h"
 
 struct Vertex
 {
@@ -26,4 +15,3 @@ struct Vertex
             && v1.uv.x == v2.uv.x && v1.uv.y == v2.uv.y);
     }
 };
-
