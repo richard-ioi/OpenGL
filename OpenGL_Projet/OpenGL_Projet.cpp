@@ -308,7 +308,9 @@ void Render(GLFWwindow* window)
                                          0.0f,  1.0f,  0.0f,  y_translation,
                                          0.0f,  0.0f,  1.0f,  z_translation,
                                          0.0f,  0.0f,  0.0f,  1.0f };
-
+    
+    float worldMatrix[] = Multiply4DMatrices(translation2D_homogene4D,Multiply4DMatrices(rotation2D_homogene4D,scale2D_homogene4D));
+    
     GLint rot2D_scale = glGetUniformLocation(program, "u_scale");
     glUniformMatrix4fv(rot2D_scale, 1, false, scale2D_homogene4D);
 
@@ -319,7 +321,7 @@ void Render(GLFWwindow* window)
     glUniformMatrix4fv(rot2D_translation, 1, false, translation2D_homogene4D);
 
     const float zNear = 0.1f;
-    const float zFar = 100.0f;
+    const float zFar = 800.0f;
     const float aspect = float(width) / float(height); //important de cast en float
     const float fov = 45.0f * M_PI / 180.0; //en radian
     const float f = 1.0f / tanf(fov / 2.0f); //cotan = 1/tan
