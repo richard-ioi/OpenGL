@@ -84,7 +84,7 @@ float * Multiply4DMatrices(float * _m1, float * _m2) {
             for (int k = 0; k < 4; k++) {
                 sum += _m1[i * 4 + k] * _m2[j + 4 * k];
             }
-            //printf("%f\n", sum);
+            result[i *4 + j] = sum;
         }
     }
     
@@ -92,7 +92,10 @@ float * Multiply4DMatrices(float * _m1, float * _m2) {
 }
 
 void UpdateScale(GLFWwindow* window, double xoffset, double yoffset) {
-    scale += yoffset * deltaTime * movementSpeed;
+    float futureScale = scale + yoffset * deltaTime * movementSpeed;
+    if (futureScale > 0) {
+        scale = futureScale;
+    }
 }
 
 void UpdateTranslation(GLFWwindow* window) {
@@ -312,17 +315,12 @@ void Render(GLFWwindow* window)
     float scaleObjectMatrix[] = { scale,  0.0f,  0.0f,  0.0f,
                             0.0f,  scale,  0.0f,  0.0f,
                             0.0f,  0.0f,  scale,  0.0f,
-                            0.0f,  0.0f,  0.0f,  1.0f };
+                            0.0f,  -1.0f,  -5.0f,  1.0f };
 
     float rotationObjectMatrix[] = {cosf(time),    0.0f,     sinf(time),       0.0f,
                                         0.0f,    1.0f,     0.0f,       0.0f,
                                         -sinf(time),  0.0f,      cosf(time),       0.0f,
-                                        0.0f,               -1.0f,           -5.0f,      1.0f };
-
-    /*float rotationObjectMatrix[] = {1.0f,  0.0f,  0.0f,  0.0f,
-                                   0.0f,  1.0f,  0.0f,  0.0f,
-                                   0.0f,  0.0f, 1.0f,  0.0f,
-                                   0.0f,  -1.0f,  -5.0f,  1.0f };*/
+                                        0.0f,               0.0f,           0.0f,      1.0f };
 
     float translationObjectMatrix[] = { 1.0f,  0.0f,  0.0f,  0.0f,
                                          0.0f,  1.0f,  0.0f,  0.0f,
@@ -347,6 +345,10 @@ void Render(GLFWwindow* window)
     vec3 up = { 0.0f,1.0f,0.0f };
 
     float * ViewMatrix = CreateViewMatrix(position, target, up);
+
+    /*for (int i = 0; i < 16; i++) {
+        printf("%f\n", ViewMatrix[i]);
+    }*/
 
     const float zNear = 0.1f;
     const float zFar = 800.0f;
