@@ -16,9 +16,7 @@ uniform mat4 u_projection;
 uniform mat4 u_view;
 uniform mat4 u_model;
 
-uniform mat4 u_translation;
-uniform mat4 u_scale;
-uniform mat4 u_rotation;
+uniform mat4 u_MVP;
 
 void main(void) 
 {

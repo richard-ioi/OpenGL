@@ -326,17 +326,6 @@ void Render(GLFWwindow* window)
                                          0.0f,  1.0f,  0.0f,  0.0f,
                                          0.0f,  0.0f,  1.0f,  0.0f,
                                          0.0f,  0.0f,  0.0f,  1.0f };
-    
-    GLint scaleObject = glGetUniformLocation(program, "u_scale");
-    glUniformMatrix4fv(scaleObject, 1, false, scaleObjectMatrix);
-
-
-    GLint rotationObject = glGetUniformLocation(program, "u_rotation");
-    glUniformMatrix4fv(rotationObject, 1, false, rotationObjectMatrix);
-
-    GLint translationObject = glGetUniformLocation(program, "u_translation");
-    glUniformMatrix4fv(translationObject, 1, false, translationObjectMatrix);
-
 
     float* ModelMatrix = Multiply4DMatrices(translationObjectMatrix, Multiply4DMatrices(rotationObjectMatrix, scaleObjectMatrix));
 
@@ -355,7 +344,7 @@ void Render(GLFWwindow* window)
     const float aspect = float(width) / float(height); //important de cast en float
     const float fov = 45.0f * M_PI / 180.0; //en radian
     const float f = 1.0f / tanf(fov / 2.0f); //cotan = 1/tan
-    const float ProjectionMatrix[] = {
+    float ProjectionMatrix[] = {
         f / aspect, 0.f, 0.f, 0.f,
         0.f, f, 0.f, 0.f,
         0.f, 0.f, ((zFar + zNear) / (zNear - zFar)), -1.f,
@@ -371,6 +360,9 @@ void Render(GLFWwindow* window)
 
     GLint model = glGetUniformLocation(program, "u_model");
     glUniformMatrix4fv(model, 1, false, ModelMatrix);
+
+    GLint MVP = glGetUniformLocation(program, "u_MVP");
+    glUniformMatrix4fv(MVP, 1, false, Multiply4DMatrices(ProjectionMatrix, ModelMatrix));
 
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, Indices.size(), GL_UNSIGNED_SHORT, 0);
