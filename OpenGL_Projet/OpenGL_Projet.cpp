@@ -229,9 +229,14 @@ bool Initialise()
     glEnableVertexAttribArray(loc_position);
     glVertexAttribPointer(loc_position, 3, GL_FLOAT, false, stride, (void*)offsetof(Vertex, position));
 
+
     int loc_uv = glGetAttribLocation(program, "a_texcoords");
     glEnableVertexAttribArray(loc_uv);
     glVertexAttribPointer(loc_uv, 2, GL_FLOAT, false, stride, (void*)offsetof(Vertex, uv));
+
+    int loc_normal = glGetAttribLocation(program, "a_normal");
+    glEnableVertexAttribArray(loc_normal);
+    glVertexAttribPointer(loc_normal, 3, GL_FLOAT, false, stride, (void*)offsetof(Vertex, normal));
 
     // La bonne pratique est de reinit a zero
     // MAIS ATTENTION, toujours le VAO en premier
