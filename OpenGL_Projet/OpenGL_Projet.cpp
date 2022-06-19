@@ -20,8 +20,6 @@
 #include "vec2.h"
 #include "Color.h"
 
-#include "Models/DragonData.h"
-
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
@@ -33,8 +31,8 @@ const char * ObjectTexture = "Models/Textures/penguin.png";
 
 GLShader g_TransformShader;
 
-GLuint VBO_P;
-GLuint IBO_P;
+GLuint VBO;
+GLuint IBO;
 GLuint VAO;
 
 GLuint TexID;
@@ -179,6 +177,9 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
                 Vertex Vj = { { vx, vy, vz }, { nx, ny, nz }, { tx, ty } };
 
                 uint16_t index = Vertices.size();
+
+                // Cherche si le Vertex existe déjà dans le tableau, pour économiser de la mémoire
+                // et réutiliser un index
                 auto it = std::find(Vertices.begin(), Vertices.end(), Vj);
                 if (it != Vertices.end()) {
                     index = it - Vertices.begin();
@@ -203,14 +204,12 @@ bool Initialise()
     g_TransformShader.LoadFragmentShader("transform.fs");
     g_TransformShader.Create();
 
-    glGenBuffers(1, &VBO_P);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_P);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(DragonVertices), DragonVertices, GL_STATIC_DRAW);
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, Vertices.size() * sizeof(Vertex), &Vertices[0], GL_STATIC_DRAW);
 
-    glGenBuffers(1, &IBO_P);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_P);
-    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(DragonIndices), DragonIndices, GL_STATIC_DRAW);
+    glGenBuffers(1, &IBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, Indices.size()*sizeof(uint16_t), &Indices[0], GL_STATIC_DRAW);
 
 
@@ -223,8 +222,8 @@ bool Initialise()
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_P);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_P);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
 
     int loc_position = glGetAttribLocation(program, "a_position");
     glEnableVertexAttribArray(loc_position);
@@ -237,10 +236,11 @@ bool Initialise()
     // La bonne pratique est de reinit a zero
     // MAIS ATTENTION, toujours le VAO en premier
     // sinon le VAO risque d'enregistrer les modifications
-    // de VertexAttrib et VBO_P
+    // de VertexAttrib et VBO
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    //Prise en charge de la texture
     glGenTextures(1, &TexID);
     glBindTexture(GL_TEXTURE_2D, TexID);
     int w, h;
@@ -249,8 +249,7 @@ bool Initialise()
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
     }
-    // filtre bilineaire
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
     // filtre trilineaire (necessite mipmap)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -263,8 +262,8 @@ void Terminate()
     glDeleteTextures(1, &TexID);
 
     glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO_P);
-    glDeleteBuffers(1, &IBO_P);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &IBO);
 
     g_TransformShader.Destroy();
 }
