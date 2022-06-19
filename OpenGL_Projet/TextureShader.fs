@@ -10,6 +10,7 @@ varying vec3 v_FragPos;
 varying vec3 v_normal;
 
 uniform sampler2D u_sampler;
+uniform vec3 u_lightPos;
 
 // Retourne la couleur diffuse pour l'illumination de Phong
 vec4 diffuse(vec3 N, vec3 L){
@@ -19,8 +20,7 @@ vec4 diffuse(vec3 N, vec3 L){
 void main(void) {
     vec4 texColor = texture2D(u_sampler, v_texcoords);
 
-    vec3 lightPos = vec3(5.0,5.0,-1.0);
     vec3 N = normalize(v_normal);
-    vec3 L = normalize(lightPos - v_FragPos);
+    vec3 L = normalize(u_lightPos - v_FragPos);
     gl_FragColor = diffuse(N,L) * texColor;
 }
