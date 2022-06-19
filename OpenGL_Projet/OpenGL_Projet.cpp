@@ -41,38 +41,40 @@ GLuint VAO;
 
 GLuint TexID;
 
-float scale= 1.0f, x_translation = 1.0f, y_translation = 1.0f, z_translation = 1.0f;
+float scale= 1.0f, x_translation = 0.0f, y_translation = 0.0f, z_translation = -5.0f;
 
 float deltaTime = 1.0f;
-float movementSpeed = 1.0f;
+float movementSpeed = 0.01f;
 float currentTime = 0;
 double lastTime = 0;
 
 std::vector<Vertex> Vertices;
 std::vector<uint16_t> Indices;
 
-float * CreateViewMatrix(vec3 position, vec3 target, vec3 up) {
-    vec3 forward = -(target-position);
+float * LookAt(vec3 position, vec3 target, vec3 up) {
+    vec3 forward = -(target-position); // zaxis
     normalize(&forward);
-    vec3 right = forward*up;
+    vec3 right = forward*up; // xaxis
+    normalize(&right);
+    up = forward * right; //yaxis
+    //normalize(&up);
     static float ViewMatrix[16];
-    ViewMatrix[0] = forward.x;
-    ViewMatrix[1] = right.x;
-    ViewMatrix[2] = up.x;
+    ViewMatrix[0] = right.x;
+    ViewMatrix[1] = up.x;
+    ViewMatrix[2] = forward.x;
     ViewMatrix[3] = 0.0f;
-    ViewMatrix[4] = forward.y;
-    ViewMatrix[5] = right.y;
-    ViewMatrix[6] = up.y;
+    ViewMatrix[4] = right.y;
+    ViewMatrix[5] = up.y;
+    ViewMatrix[6] = forward.y;
     ViewMatrix[7] = 0.0f;
-    ViewMatrix[8] = forward.z;
-    ViewMatrix[9] = right.z;
-    ViewMatrix[10] = up.z;
+    ViewMatrix[8] = right.z;
+    ViewMatrix[9] = up.z;
+    ViewMatrix[10] = forward.z;
     ViewMatrix[11] = 0.0f;
-    ViewMatrix[12] = -dot(forward,position);
-    ViewMatrix[13] = -dot(right, position);
-    ViewMatrix[14] = -dot(up, position);;
+    ViewMatrix[12] = -dot(right,position);
+    ViewMatrix[13] = -dot(up, position);
+    ViewMatrix[14] = -dot(forward, position);;
     ViewMatrix[15] = 1.0f;
-
     return ViewMatrix;
 }
 
@@ -111,7 +113,7 @@ void UpdateTranslation(GLFWwindow* window) {
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
         z_translation -= deltaTime * movementSpeed;
     }
-    if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { // En réalité Z sur clavier AZERTY, (mais W sur QWERTY du coup) 
         y_translation += deltaTime * movementSpeed;
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
@@ -315,29 +317,30 @@ void Render(GLFWwindow* window)
     float scaleObjectMatrix[] = { scale,  0.0f,  0.0f,  0.0f,
                             0.0f,  scale,  0.0f,  0.0f,
                             0.0f,  0.0f,  scale,  0.0f,
-                            0.0f,  -1.0f,  -5.0f,  1.0f };
+                            0.0f,  0.0f,  0.0f,  1.0f };
 
-    float rotationObjectMatrix[] = {cosf(time),    0.0f,     sinf(time),       0.0f,
+    /*float rotationObjectMatrix[] = {cosf(time),    0.0f,     sinf(time),       0.0f,
                                         0.0f,    1.0f,     0.0f,       0.0f,
                                         -sinf(time),  0.0f,      cosf(time),       0.0f,
+                                        0.0f,               0.0f,           0.0f,      1.0f };*/
+
+    float rotationObjectMatrix[] = {1.0f,    0.0f,     0.0f,       0.0f,
+                                        0.0f,    1.0f,     0.0f,       0.0f,
+                                        0.0f,  0.0f,      1.0f,       0.0f,
                                         0.0f,               0.0f,           0.0f,      1.0f };
 
     float translationObjectMatrix[] = { 1.0f,  0.0f,  0.0f,  0.0f,
                                          0.0f,  1.0f,  0.0f,  0.0f,
                                          0.0f,  0.0f,  1.0f,  0.0f,
-                                         0.0f,  0.0f,  0.0f,  1.0f };
+                                         x_translation,  y_translation,  z_translation,  1.0f };
 
-    float* ModelMatrix = Multiply4DMatrices(translationObjectMatrix, Multiply4DMatrices(rotationObjectMatrix, scaleObjectMatrix));
+    float* ModelMatrix = Multiply4DMatrices(Multiply4DMatrices(translationObjectMatrix, rotationObjectMatrix), scaleObjectMatrix);
 
-    vec3 position = { x_translation, y_translation, z_translation };
-    vec3 target = { 0.0f,0.0f,0.0f};
+    vec3 position = { 0.1f, 0.2f, -1.0f };
+    vec3 target = { 0.1f,0.1f,-5.0f};
     vec3 up = { 0.0f,1.0f,0.0f };
 
-    float * ViewMatrix = CreateViewMatrix(position, target, up);
-
-    /*for (int i = 0; i < 16; i++) {
-        printf("%f\n", ViewMatrix[i]);
-    }*/
+    float * ViewMatrix = LookAt(position, target, up);
 
     const float zNear = 0.1f;
     const float zFar = 800.0f;
@@ -361,8 +364,10 @@ void Render(GLFWwindow* window)
     GLint model = glGetUniformLocation(program, "u_model");
     glUniformMatrix4fv(model, 1, false, ModelMatrix);
 
+    float* MVPMatrix = Multiply4DMatrices(Multiply4DMatrices(ProjectionMatrix, ViewMatrix), ModelMatrix);
+
     GLint MVP = glGetUniformLocation(program, "u_MVP");
-    glUniformMatrix4fv(MVP, 1, false, Multiply4DMatrices(ProjectionMatrix, ModelMatrix));
+    glUniformMatrix4fv(MVP, 1, false, MVPMatrix);
 
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, Indices.size(), GL_UNSIGNED_SHORT, 0);
