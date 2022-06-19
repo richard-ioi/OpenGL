@@ -1,5 +1,4 @@
 ﻿
-// seulement si glew32s.lib
 #define GLEW_STATIC 1
 
 #define _USE_MATH_DEFINES
@@ -26,7 +25,6 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
-// attention, ce define ne doit etre specifie que dans 1 seul fichier cpp
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -35,14 +33,15 @@ const char * ObjectTexture = "Models/Textures/penguin.png";
 
 GLShader g_TransformShader;
 
-GLuint VBO;
-GLuint IBO;
+GLuint VBO_P;
+GLuint IBO_P;
 GLuint VAO;
 
 GLuint TexID;
 
-float scale= 1.0f, x_translation = 0.0f, y_translation = 0.0f, z_translation = -5.0f;
+float x_translation = 0.0f, y_translation = 0.0f, z_translation = -5.0f; // Coordonnées de position du modèle au lancement
 
+//Calcul de deltaTime utile pour la vitesse de déplacement de la caméra
 float deltaTime = 1.0f;
 float movementSpeed = 0.01f;
 float currentTime = 0;
@@ -51,6 +50,8 @@ double lastTime = 0;
 std::vector<Vertex> Vertices;
 std::vector<uint16_t> Indices;
 
+/* Fonction retournant une ViewMatrix calculée 
+en fonction des vecteurs position, target et up donnés*/
 float * LookAt(vec3 position, vec3 target, vec3 up) {
     vec3 forward = -(target-position); // zaxis
     normalize(&forward);
@@ -78,6 +79,8 @@ float * LookAt(vec3 position, vec3 target, vec3 up) {
     return ViewMatrix;
 }
 
+/* Fonction permettant de multiplier deux matrices 4D
+   représentées par des tableaux de float 1D */
 float * Multiply4DMatrices(float * _m1, float * _m2) {
     static float result[16];
     for (int i = 0; i < 4; i++) {
@@ -93,14 +96,16 @@ float * Multiply4DMatrices(float * _m1, float * _m2) {
     return result;
 }
 
-void UpdateScale(GLFWwindow* window, double xoffset, double yoffset) {
-    float futureScale = scale + yoffset * deltaTime * movementSpeed;
-    if (futureScale > 0) {
-        scale = futureScale;
-    }
+/* 
+* Update la position z du modèle (scroll de la souris)
+*/
+void UpdateZTranslation(GLFWwindow* window, double xoffset, double yoffset) {
+    z_translation = z_translation + yoffset * deltaTime * movementSpeed;
 }
 
+/* Update la position du modèle en fonction des input*/
 void UpdateTranslation(GLFWwindow* window) {
+    glfwSetScrollCallback(window, UpdateZTranslation);
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
         x_translation += deltaTime * movementSpeed;
     }
@@ -108,19 +113,14 @@ void UpdateTranslation(GLFWwindow* window) {
         x_translation -= deltaTime * movementSpeed;
     }
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-        z_translation += deltaTime * movementSpeed;
-    }
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        z_translation -= deltaTime * movementSpeed;
-    }
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) { // En réalité Z sur clavier AZERTY, (mais W sur QWERTY du coup) 
         y_translation += deltaTime * movementSpeed;
     }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
         y_translation -= deltaTime * movementSpeed;
     }
 }
-
+/* Permet de charger un modèle .obj et retourne un tuple contenant
+ un tableau de Vertex et un tableau d'indices */
 std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string inputfile) {
     std::vector<Vertex> Vertices;
     std::vector<uint16_t> Indices;
@@ -203,13 +203,13 @@ bool Initialise()
     g_TransformShader.LoadFragmentShader("transform.fs");
     g_TransformShader.Create();
 
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glGenBuffers(1, &VBO_P);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_P);
     //glBufferData(GL_ARRAY_BUFFER, sizeof(DragonVertices), DragonVertices, GL_STATIC_DRAW);
     glBufferData(GL_ARRAY_BUFFER, Vertices.size() * sizeof(Vertex), &Vertices[0], GL_STATIC_DRAW);
 
-    glGenBuffers(1, &IBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+    glGenBuffers(1, &IBO_P);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_P);
     //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(DragonIndices), DragonIndices, GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, Indices.size()*sizeof(uint16_t), &Indices[0], GL_STATIC_DRAW);
 
@@ -223,8 +223,8 @@ bool Initialise()
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_P);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_P);
 
     int loc_position = glGetAttribLocation(program, "a_position");
     glEnableVertexAttribArray(loc_position);
@@ -237,7 +237,7 @@ bool Initialise()
     // La bonne pratique est de reinit a zero
     // MAIS ATTENTION, toujours le VAO en premier
     // sinon le VAO risque d'enregistrer les modifications
-    // de VertexAttrib et VBO
+    // de VertexAttrib et VBO_P
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -263,8 +263,8 @@ void Terminate()
     glDeleteTextures(1, &TexID);
 
     glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &IBO);
+    glDeleteBuffers(1, &VBO_P);
+    glDeleteBuffers(1, &IBO_P);
 
     g_TransformShader.Destroy();
 }
@@ -286,9 +286,8 @@ void Render(GLFWwindow* window)
     // etape c. on specifie le shader program a utiliser
     auto program = g_TransformShader.GetProgram();
     glUseProgram(program);
-    // etape d. 
+  
 
-    // etape e. 
     GLint timeLocation = glGetUniformLocation(program, "u_time");
     const float time = glfwGetTime();
     glUniform1f(timeLocation, time);
@@ -312,11 +311,10 @@ void Render(GLFWwindow* window)
     float deltaTime = float(currentTime - lastTime);
 
     UpdateTranslation(window);
-    glfwSetScrollCallback(window, UpdateScale);
 
-    float scaleObjectMatrix[] = { scale,  0.0f,  0.0f,  0.0f,
-                            0.0f,  scale,  0.0f,  0.0f,
-                            0.0f,  0.0f,  scale,  0.0f,
+    float scaleObjectMatrix[] = { 0.8f,  0.0f,  0.0f,  0.0f,
+                            0.0f,  0.8f,  0.0f,  0.0f,
+                            0.0f,  0.0f,  0.8f,  0.0f,
                             0.0f,  0.0f,  0.0f,  1.0f };
 
     /*float rotationObjectMatrix[] = {cosf(time),    0.0f,     sinf(time),       0.0f,
