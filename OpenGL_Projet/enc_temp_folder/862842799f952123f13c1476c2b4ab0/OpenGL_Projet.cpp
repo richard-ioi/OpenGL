@@ -36,11 +36,6 @@ GLuint VBO;
 GLuint IBO;
 GLuint VAO;
 
-GLuint VBO2;
-GLuint IBO2;
-GLuint VAO2;
-
-
 GLuint TexID;
 
 float x_translation = 0.0f, y_translation = 0.0f, z_translation = -5.0f; // Coordonnées de position du modèle au lancement

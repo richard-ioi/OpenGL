@@ -10,7 +10,7 @@ attribute vec3 a_color;
 // varying = output du VERTEX shader et INPUT du FRAGMENT shader
 varying vec2 v_texcoords;
 varying vec4 v_color;
-varying vec3 v_fragPos;
+varying vec3 v_FragPos;
 varying vec3 v_normal;
 
 uniform float u_time;
@@ -30,7 +30,7 @@ void main(void)
 	//l'ordre des transformations est important -> sens de rotation
 	//v' = PROJECTION * (T * R * S * v)
 	gl_Position =  u_ProjectionMatrix  * u_WorldMatrix * vec4(a_position,1.0) ; //en changeant la pos, on eloigne le PDV/"camera"
-	v_fragPos = vec3(u_WorldMatrix * vec4(a_position, 1.0));
+	v_FragPos = vec3(u_WorldMatrix * vec4(a_position, 1.0));
 
 	v_color = vec4(a_color, 1.0);
 }
