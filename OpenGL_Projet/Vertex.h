@@ -1,24 +1,15 @@
 #pragma once
 
-#include <cstdint>
-
-struct vec2 {
-    float x, y;
-};
-
-struct vec3 {
-    float x, y, z;
-};
-
-struct Color {
-    uint8_t r, g, b, a;
-};
+#include "vec3.h"
+#include "vec2.h"
+#include "Color.h"
 
 struct Vertex
 {
     vec3 position;  //x,y,z
     vec3 normal;    //nx,ny,nz
     vec2 uv;        //u,v
+    Color color;
 
     friend bool operator== (const Vertex& v1, const Vertex& v2) {
         return (v1.position.x==v2.position.x && v1.position.y==v2.position.y && v1.position.z==v2.position.z
@@ -26,4 +17,3 @@ struct Vertex
             && v1.uv.x == v2.uv.x && v1.uv.y == v2.uv.y);
     }
 };
-

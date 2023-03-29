@@ -1,5 +1,4 @@
 ﻿
-// seulement si glew32s.lib
 #define GLEW_STATIC 1
 
 #define _USE_MATH_DEFINES
@@ -13,36 +12,119 @@
 #include <tuple>
 
 #include "GL/glew.h"
-
 #include <GLFW/glfw3.h>
-
 #include "../common/GLShader.h"
 
 #include "Vertex.h"
-#include "Models/DragonData.h"
+#include "vec3.h"
+#include "vec2.h"
+#include "Color.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
-// attention, ce define ne doit etre specifie que dans 1 seul fichier cpp
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-std::string ObjectModel = "Models/penguin.obj";
-const char * ObjectTexture = "Models/Textures/penguin.png";
+std::string PenguinModel = "Models/penguin.obj";
+const char * PenguinTexture = "Models/Textures/penguin.png";
 
-GLShader g_TransformShader;
+std::string TeapotModel = "Models/teapot.obj";
 
-GLuint VBO;
-GLuint IBO;
-GLuint VAO;
+GLShader g_TextureShader;
+GLShader g_ColorShader;
+
+GLuint VBO_PENGUIN;
+GLuint IBO_PENGUIN;
+GLuint VAO_PENGUIN;
+
+GLuint VBO_TEAPOT;
+GLuint IBO_TEAPOT;
+GLuint VAO_TEAPOT;
+
 
 GLuint TexID;
 
-std::vector<Vertex> Vertices;
-std::vector<uint16_t> Indices;
-std::vector<float> Colors;
+float x_translation = 0.0f, y_translation = -0.5f, z_translation = -15.0f; // Coordonnées de position du modèle au lancement
 
+float movementSpeed = 0.01f;//Rapidité du mouvement des objets (scroll/flèches)
+
+std::vector<Vertex> VerticesPenguin;
+std::vector<uint16_t> IndicesPenguin;
+
+std::vector<Vertex> VerticesTeapot;
+std::vector<uint16_t> IndicesTeapot;
+
+/* Fonction retournant une ViewMatrix calculée 
+en fonction des vecteurs position, target et up donnés*/
+float * LookAt(vec3 position, vec3 target, vec3 up) {
+    vec3 forward = -(target-position); // zaxis
+    normalize(&forward);
+    vec3 right = forward*up; // xaxis
+    normalize(&right);
+    up = forward * right; //yaxis
+    static float ViewMatrix[16];
+    ViewMatrix[0] = right.x;
+    ViewMatrix[1] = up.x;
+    ViewMatrix[2] = forward.x;
+    ViewMatrix[3] = 0.0f;
+    ViewMatrix[4] = right.y;
+    ViewMatrix[5] = up.y;
+    ViewMatrix[6] = forward.y;
+    ViewMatrix[7] = 0.0f;
+    ViewMatrix[8] = right.z;
+    ViewMatrix[9] = up.z;
+    ViewMatrix[10] = forward.z;
+    ViewMatrix[11] = 0.0f;
+    ViewMatrix[12] = -dot(right,position);
+    ViewMatrix[13] = -dot(up, position);
+    ViewMatrix[14] = -dot(forward, position);;
+    ViewMatrix[15] = 1.0f;
+    return ViewMatrix;
+}
+
+/* Fonction permettant de multiplier deux matrices 4D
+   représentées par des tableaux de float 1D */
+float * Multiply4DMatrices(float * _m1, float * _m2) {
+    static float result[16];
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            float sum = 0.0f;
+            for (int k = 0; k < 4; k++) {
+                sum += _m1[i * 4 + k] * _m2[j + 4 * k];
+            }
+            result[i *4 + j] = sum;
+        }
+    }
+    
+    return result;
+}
+
+/* 
+* Update la position z du modèle (scroll de la souris)
+*/
+void UpdateScroll(GLFWwindow* window, double xoffset, double yoffset) {
+    z_translation = z_translation + yoffset * movementSpeed;
+}
+
+/* Update la position du modèle en fonction des input*/
+void UpdateInput(GLFWwindow* window) {
+    glfwSetScrollCallback(window, UpdateScroll);
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        x_translation -= movementSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+        x_translation +=  movementSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+        y_translation -= movementSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+        y_translation += movementSpeed;
+    }
+}
+/* Permet de charger un modèle .obj et retourne un tuple contenant
+ un tableau de Vertex et un tableau d'indices */
 std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string inputfile) {
     std::vector<Vertex> Vertices;
     std::vector<uint16_t> Indices;
@@ -98,9 +180,13 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
                     ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
                 }
 
-                Vertex Vj = { { vx, vy, vz }, { nx, ny, nz }, { tx, ty } };
+
+                Vertex Vj = { { vx, vy, vz }, { nx, ny, nz }, { tx, ty } , {255,0,0,255}};
 
                 uint16_t index = Vertices.size();
+
+                // Cherche si le Vertex existe déjà dans le tableau, pour économiser de la mémoire
+                // et réutiliser un index
                 auto it = std::find(Vertices.begin(), Vertices.end(), Vj);
                 if (it != Vertices.end()) {
                     index = it - Vertices.begin();
@@ -108,22 +194,9 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
                 else {
                     Vertices.push_back(Vj);
                 }
-
                 Indices.push_back(index);
-
-
-                // Optional: vertex colors
-                tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-                tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
-                Colors.push_back(red);
-                Colors.push_back(green);
-                Colors.push_back(blue);
             }
             index_offset += fv;
-
-            // per-face material
-            //shapes[s].mesh.material_ids[f];
         }
     }
     return {Vertices, Indices};
@@ -131,60 +204,96 @@ std::tuple<std::vector<Vertex>, std::vector<uint16_t>> LoadObj(std::string input
 
 bool Initialise()
 {
-    tie(Vertices, Indices) = LoadObj(ObjectModel);
+    tie(VerticesPenguin, IndicesPenguin) = LoadObj(PenguinModel);
+    tie(VerticesTeapot, IndicesTeapot) = LoadObj(TeapotModel);
     GLenum ret = glewInit();
 
-    g_TransformShader.LoadVertexShader("transform.vs");
-    g_TransformShader.LoadFragmentShader("transform.fs");
-    g_TransformShader.Create();
+    g_TextureShader.LoadVertexShader("TextureShader.vs");
+    g_TextureShader.LoadFragmentShader("TextureShader.fs");
+    g_TextureShader.Create();
 
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(DragonVertices), DragonVertices, GL_STATIC_DRAW);
-    glBufferData(GL_ARRAY_BUFFER, Vertices.size() * sizeof(Vertex), &Vertices[0], GL_STATIC_DRAW);
+    g_ColorShader.LoadVertexShader("ColorShader.vs");
+    g_ColorShader.LoadFragmentShader("ColorShader.fs");
+    g_ColorShader.Create();
 
-    glGenBuffers(1, &IBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(DragonIndices), DragonIndices, GL_STATIC_DRAW);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, Indices.size()*sizeof(uint16_t), &Indices[0], GL_STATIC_DRAW);
+    glGenBuffers(1, &VBO_PENGUIN);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_PENGUIN);
+    glBufferData(GL_ARRAY_BUFFER, VerticesPenguin.size() * sizeof(Vertex), &VerticesPenguin[0], GL_STATIC_DRAW);
+
+    glGenBuffers(1, &IBO_PENGUIN);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_PENGUIN);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, IndicesPenguin.size()*sizeof(uint16_t), &IndicesPenguin[0], GL_STATIC_DRAW);
+
+    glGenBuffers(1, &VBO_TEAPOT);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_TEAPOT);
+    glBufferData(GL_ARRAY_BUFFER, VerticesTeapot.size() * sizeof(Vertex), &VerticesTeapot[0], GL_STATIC_DRAW);
+
+    glGenBuffers(1, &IBO_TEAPOT);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_TEAPOT);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, IndicesTeapot.size() * sizeof(uint16_t), &IndicesTeapot[0], GL_STATIC_DRAW);
+
 
     constexpr size_t stride = sizeof(Vertex);// sizeof(float) * 5;
 
     // 
-    auto program = g_TransformShader.GetProgram();
+    auto ProgramTextureShader = g_TextureShader.GetProgram();
 
-    // VAO ---
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
+    // Penguin Object
+    glGenVertexArrays(1, &VAO_PENGUIN);
+    glBindVertexArray(VAO_PENGUIN);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_PENGUIN);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_PENGUIN);
 
-    int loc_position = glGetAttribLocation(program, "a_position");
+    int loc_position = glGetAttribLocation(ProgramTextureShader, "a_position");
     glEnableVertexAttribArray(loc_position);
     glVertexAttribPointer(loc_position, 3, GL_FLOAT, false, stride, (void*)offsetof(Vertex, position));
 
-    int loc_uv = glGetAttribLocation(program, "a_texcoords");
+
+    int loc_uv = glGetAttribLocation(ProgramTextureShader, "a_texcoords");
     glEnableVertexAttribArray(loc_uv);
     glVertexAttribPointer(loc_uv, 2, GL_FLOAT, false, stride, (void*)offsetof(Vertex, uv));
 
-    // La bonne pratique est de reinit a zero
-    // MAIS ATTENTION, toujours le VAO en premier
-    // sinon le VAO risque d'enregistrer les modifications
-    // de VertexAttrib et VBO
+    int loc_normal = glGetAttribLocation(ProgramTextureShader, "a_normal");
+    glEnableVertexAttribArray(loc_normal);
+    glVertexAttribPointer(loc_normal, 3, GL_FLOAT, false, stride, (void*)offsetof(Vertex, normal));
+
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
+    auto ProgramColorShader = g_ColorShader.GetProgram();
+    // Teapot Object
+    glGenVertexArrays(1, &VAO_TEAPOT);
+    glBindVertexArray(VAO_TEAPOT);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_TEAPOT);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO_TEAPOT);
+
+    int loc_position2 = glGetAttribLocation(ProgramColorShader, "a_position");
+    glEnableVertexAttribArray(loc_position2);
+    glVertexAttribPointer(loc_position2, 3, GL_FLOAT, false, stride, (void*)offsetof(Vertex, position));
+
+    int loc_normal2 = glGetAttribLocation(ProgramColorShader, "a_normal");
+    glEnableVertexAttribArray(loc_normal2);
+    glVertexAttribPointer(loc_normal2, 3, GL_FLOAT, false, stride, (void*)offsetof(Vertex, normal));
+
+    int loc_color2 = glGetAttribLocation(ProgramColorShader, "a_color");
+    glEnableVertexAttribArray(loc_color2);
+    glVertexAttribPointer(loc_color2, 4, GL_UNSIGNED_BYTE, true, stride, (void*)offsetof(Vertex, color));
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    //Prise en charge de la texture
     glGenTextures(1, &TexID);
     glBindTexture(GL_TEXTURE_2D, TexID);
     int w, h;
-    uint8_t* data = stbi_load(ObjectTexture, &w, &h, nullptr, STBI_rgb_alpha);
+    uint8_t* data = stbi_load(PenguinTexture, &w, &h, nullptr, STBI_rgb_alpha);
     if (data != nullptr) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
     }
-    // filtre bilineaire
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
     // filtre trilineaire (necessite mipmap)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -196,11 +305,11 @@ void Terminate()
 {
     glDeleteTextures(1, &TexID);
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &IBO);
+    glDeleteVertexArrays(1, &VAO_PENGUIN);
+    glDeleteBuffers(1, &VBO_PENGUIN);
+    glDeleteBuffers(1, &IBO_PENGUIN);
 
-    g_TransformShader.Destroy();
+    g_TextureShader.Destroy();
 }
 
 void Render(GLFWwindow* window)
@@ -208,70 +317,143 @@ void Render(GLFWwindow* window)
     int width, height;
     glfwGetWindowSize(window, &width, &height);
 
+    glViewport(0, 0, width, height);
+    glClearColor(0.5f, 0.5f, 0.5f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
-    
-    // etape a. A vous de recuperer/passer les variables width/height
-    glViewport(0, 0, width, height);
-    // etape b. Notez que glClearColor est un etat, donc persistant
-    glClearColor(0.5f, 0.5f, 0.5f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // etape c. on specifie le shader program a utiliser
-    auto program = g_TransformShader.GetProgram();
-    glUseProgram(program);
-    // etape d. 
 
-    // etape e. 
-    GLint timeLocation = glGetUniformLocation(program, "u_time");
-    const float time = glfwGetTime();
-    glUniform1f(timeLocation, time);
+    vec3 position = { 0.1f, 0.2f, -1.0f };
+    vec3 target = { 0.1f,0.1f,-5.0f };
+    vec3 up = { 0.0f,1.0f,0.0f }; 
+    float* ViewMatrix = LookAt(position, target, up);
 
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, TexID);
-
-    GLint textureLocation = glGetUniformLocation(program, "u_sampler");
-    // 0 ici correspond au canal 0 cad GL_TEXTURE0
-    glUniform1i(textureLocation, 0);
-
-
-
-    //colonnes d'abord
-    //multiplication : droite vers la gauche
-    //v' = M * v
-    float rotation2D_homogene3D[] = { cosf(time),     sinf(time),     0.0f,
-                                        - sinf(time),    cosf(time),     0.0f,
-                                        0.0f,           0.0f,           1.0f };
-
-    float rotation2D_homogene4D[] = { cosf(time),    0.0f,     sinf(time),       0.0f,
-                                        0.0f,    1.0f,     0.0f,       0.0f,
-                                        -sinf(time),  0.0f,      cosf(time),       0.0f,
-                                        0.0f,               0.0f,           -5.0f,      1.0f };
-
-    GLint rot2D_location = glGetUniformLocation(program, "u_rotation4D");
-    glUniformMatrix4fv(rot2D_location, 1, false, rotation2D_homogene4D);
+    float lightPos[] = { 18.0f,2.0f,-10.0f };
 
     const float zNear = 0.1f;
-    const float zFar = 100.0f;
+    const float zFar = 800.0f;
     const float aspect = float(width) / float(height); //important de cast en float
     const float fov = 45.0f * M_PI / 180.0; //en radian
     const float f = 1.0f / tanf(fov / 2.0f); //cotan = 1/tan
-    const float projection[] = {
+    float ProjectionMatrix[] = {
         f / aspect, 0.f, 0.f, 0.f,
         0.f, f, 0.f, 0.f,
         0.f, 0.f, ((zFar + zNear) / (zNear - zFar)), -1.f,
         0.f, 0.f, ((2 * zNear * zFar) / (zNear - zFar)), 0.f
     };
 
-    GLint rot2D_proj = glGetUniformLocation(program, "u_projection");
-    glUniformMatrix4fv(rot2D_proj, 1, false, projection);
+    // ###########################################
+    //       RENDERING DU TEAPOT OBJECT
+    // ###########################################
+    auto ProgramColorShader = g_ColorShader.GetProgram();
+    glUseProgram(ProgramColorShader);
 
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, Indices.size(), GL_UNSIGNED_SHORT, 0);
+    // Position de notre lumière pour l'illumination de phong
+    GLint lightPosLocationTeapot = glGetUniformLocation(ProgramColorShader, "u_lightPos");
+    glUniform3fv(lightPosLocationTeapot, 1, lightPos);
 
-    // on suppose que la phase d’echange des buffers front et back
-    // le « swap buffers » est effectuee juste apres
+    float scaleObjectMatrixTeapot[] = { .009f,  0.0f,  0.0f,  0.0f,
+                                        0.0f,  .009f,  0.0f,  0.0f,
+                                        0.0f,  0.0f,  .009f,  0.0f,
+                                        0.0f,  0.0f,  0.0f,  1.0f };
+
+    float rotationObjectMatrixTeapot[] = { cosf(0.5),   0.0f,      0.0f,       0.0f,
+                                        0.0f,    1.0f,    0.0f,       0.0f,
+                                        0.0f,  0.0f,      1.0f,       0.0f,
+                                        0.0f,               0.0f,           0.0f,      1.0f };
+
+    float translationObjectMatrixTeapot[] = { 1.0f,  0.0f,  0.0f,  0.0f,
+                                         0.0f,  1.0f,  0.0f,  0.0f,
+                                         0.0f,  0.0f,  1.0f,  0.0f,
+                                         x_translation - 5.0f,  y_translation-2.0f,  z_translation,  1.0f };
+
+    float* WorldMatrix2 = Multiply4DMatrices(Multiply4DMatrices(translationObjectMatrixTeapot, rotationObjectMatrixTeapot), scaleObjectMatrixTeapot);
+
+    GLint projection_teapot = glGetUniformLocation(ProgramColorShader, "u_ProjectionMatrix");
+    glUniformMatrix4fv(projection_teapot, 1, false, ProjectionMatrix);
+
+    GLint view_teapot = glGetUniformLocation(ProgramColorShader, "u_ViewMatrix");
+    glUniformMatrix4fv(view_teapot, 1, false, ViewMatrix);
+
+    GLint world_teapot = glGetUniformLocation(ProgramColorShader, "u_WorldMatrix");
+    glUniformMatrix4fv(world_teapot, 1, false, WorldMatrix2);
+
+    float* MVPMatrixTeapot = Multiply4DMatrices(Multiply4DMatrices(ProjectionMatrix, ViewMatrix), WorldMatrix2);
+
+    GLint MVP_teapot = glGetUniformLocation(ProgramColorShader, "u_MVP");
+    glUniformMatrix4fv(MVP_teapot, 1, false, MVPMatrixTeapot);
+
+    glBindVertexArray(VAO_TEAPOT);
+    glDrawElements(GL_TRIANGLES, IndicesTeapot.size(), GL_UNSIGNED_SHORT, 0);
+
+    // ###########################################
+
+    // ###########################################
+    //       RENDERING DU PENGUIN OBJECT
+    // ###########################################
+
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    auto ProgramTextureShader = g_TextureShader.GetProgram();
+    glUseProgram(ProgramTextureShader);
+  
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glDepthFunc(GL_LESS);
+    GLint timeLocationPenguin = glGetUniformLocation(ProgramTextureShader, "u_time");
+    const float time = glfwGetTime();
+    glUniform1f(timeLocationPenguin, time);
+
+    // Position de notre lumière pour l'illumination de phong
+    GLint lightPosLocationPenguin = glGetUniformLocation(ProgramTextureShader, "u_lightPos");
+    glUniform3fv(lightPosLocationPenguin, 1 , lightPos);
+
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, TexID);
+
+    GLint textureLocationPenguin = glGetUniformLocation(ProgramTextureShader, "u_sampler");
+    // 0 ici correspond au canal 0 cad GL_TEXTURE0
+    glUniform1i(textureLocationPenguin, 0);
+
+    float scaleObjectMatrixPenguin[] = { 20.0f,  0.0f,  0.0f,  0.0f,
+                                 0.0f,  20.0f,  0.0f,  0.0f,
+                                 0.0f,  0.0f,  20.0f,  0.0f,
+                                 0.0f,  0.0f,  0.0f,  1.0f };
+
+    float rotationObjectMatrixPenguin[] = {1.0f,    0.0f,     0.0f,       0.0f,
+                                        0.0f,    1.0f,     0.0f,       0.0f,
+                                        0.0f,  0.0f,      1.0f,       0.0f,
+                                        0.0f,               0.0f,           0.0f,      1.0f };
+
+    float translationObjectMatrixPenguin[] = { 1.0f,  0.0f,  0.0f,  0.0f,
+                                         0.0f,  1.0f,  0.0f,  0.0f,
+                                         0.0f,  0.0f,  1.0f,  0.0f,
+                                         x_translation,  y_translation,  z_translation+12.0f,  1.0f };
+
+    float* WorldMatrixPenguin = Multiply4DMatrices(Multiply4DMatrices(translationObjectMatrixPenguin, rotationObjectMatrixPenguin), scaleObjectMatrixPenguin);
+
+
+    GLint projection_penguin = glGetUniformLocation(ProgramTextureShader, "u_ProjectionMatrix");
+    glUniformMatrix4fv(projection_penguin, 1, false, ProjectionMatrix);
+
+    GLint view_penguin = glGetUniformLocation(ProgramTextureShader, "u_ViewMatrix");
+    glUniformMatrix4fv(view_penguin, 1, false, ViewMatrix);
+
+    GLint world_penguin = glGetUniformLocation(ProgramTextureShader, "u_WorldMatrix");
+    glUniformMatrix4fv(world_penguin, 1, false, WorldMatrixPenguin);
+
+    float* MVPMatrixPenguin = Multiply4DMatrices(Multiply4DMatrices(ProjectionMatrix, ViewMatrix), WorldMatrixPenguin);
+
+    GLint MVP_penguin = glGetUniformLocation(ProgramTextureShader, "u_MVP");
+    glUniformMatrix4fv(MVP_penguin, 1, false, MVPMatrixPenguin);
+
+    glBindVertexArray(VAO_PENGUIN);
+    glDrawElements(GL_TRIANGLES, IndicesPenguin.size(), GL_UNSIGNED_SHORT, 0);
+
 }
 
 
@@ -299,6 +481,9 @@ int main(void)
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
+        /*Update movements input*/
+        UpdateInput(window);
+
         /* Render here */
         Render(window);
 

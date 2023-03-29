@@ -153,7 +153,10 @@
     <ClCompile Include="OpenGL_Projet.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Color.h" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="vec2.h" />
+    <ClInclude Include="vec3.h" />
     <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
